@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cometbft/cometbft/libs/log"
+	"cosmossdk.io/log"
 	tmquery "github.com/cometbft/cometbft/libs/pubsub/query"
 	rpcclient "github.com/cometbft/cometbft/rpc/client"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -31,7 +31,7 @@ const (
 
 var (
 	txEvents  = tmtypes.QueryForEvent(tmtypes.EventTx).String()
-	evmEvents = tmquery.MustParse(fmt.Sprintf("%s='%s' AND %s.%s='%s'",
+	evmEvents = tmquery.MustCompile(fmt.Sprintf("%s='%s' AND %s.%s='%s'",
 		tmtypes.EventTypeKey,
 		tmtypes.EventTx,
 		sdk.EventTypeMessage,
@@ -145,7 +145,13 @@ func (s *RPCStream) start(
 				continue
 			}
 
-			baseFee := types.BaseFeeFromEvents(data.ResultBeginBlock.Events)
+			// TODO(thai): It must be revised. I guess it can't be succeeded.
+			dataForEvents, ok := ev.Data.(tmtypes.EventDataNewBlockEvents)
+			if !ok {
+				s.logger.Error("event data type mismatch", "type", fmt.Sprintf("%T", ev.Data))
+				continue
+			}
+			baseFee := types.BaseFeeFromEvents(dataForEvents.Events)
 
 			// TODO: fetch bloom from events
 			header := types.EthHeaderFromTendermint(data.Header, ethtypes.Bloom{}, baseFee)

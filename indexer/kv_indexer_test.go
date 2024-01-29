@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"testing"
 
+	tmlog "cosmossdk.io/log"
 	"cosmossdk.io/simapp/params"
-	dbm "github.com/cometbft/cometbft-db"
+	dbm "github.com/cosmos/cosmos-db"
 	abci "github.com/cometbft/cometbft/abci/types"
-	tmlog "github.com/cometbft/cometbft/libs/log"
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/ethereum/go-ethereum/common"
@@ -55,14 +55,14 @@ func TestKVIndexer(t *testing.T) {
 	testCases := []struct {
 		name        string
 		block       *tmtypes.Block
-		blockResult []*abci.ResponseDeliverTx
+		blockResult *abci.ResponseFinalizeBlock
 		expSuccess  bool
 	}{
 		{
 			"success, format 1",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code: 0,
 					Events: []abci.Event{
 						{Type: types.EventTypeEthereumTx, Attributes: []abci.EventAttribute{
@@ -74,15 +74,15 @@ func TestKVIndexer(t *testing.T) {
 							{Key: "recipient", Value: "0x775b87ef5D82ca211811C1a02CE0fE0CA3a455d7"},
 						}},
 					},
-				},
+				}},
 			},
 			true,
 		},
 		{
 			"success, format 2",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code: 0,
 					Events: []abci.Event{
 						{Type: types.EventTypeEthereumTx, Attributes: []abci.EventAttribute{
@@ -96,53 +96,53 @@ func TestKVIndexer(t *testing.T) {
 							{Key: "recipient", Value: "0x775b87ef5D82ca211811C1a02CE0fE0CA3a455d7"},
 						}},
 					},
-				},
+				}},
 			},
 			true,
 		},
 		{
 			"success, exceed block gas limit",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code:   11,
 					Log:    "out of gas in location: block gas meter; gasWanted: 21000",
 					Events: []abci.Event{},
-				},
+				}},
 			},
 			true,
 		},
 		{
 			"fail, failed eth tx",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code:   15,
 					Log:    "nonce mismatch",
 					Events: []abci.Event{},
-				},
+				}},
 			},
 			false,
 		},
 		{
 			"fail, invalid events",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code:   0,
 					Events: []abci.Event{},
-				},
+				}},
 			},
 			false,
 		},
 		{
 			"fail, not eth tx",
 			&tmtypes.Block{Header: tmtypes.Header{Height: 1}, Data: tmtypes.Data{Txs: []tmtypes.Tx{txBz2}}},
-			[]*abci.ResponseDeliverTx{
-				{
+			&abci.ResponseFinalizeBlock{
+				TxResults: []*abci.ExecTxResult{{
 					Code:   0,
 					Events: []abci.Event{},
-				},
+				}},
 			},
 			false,
 		},

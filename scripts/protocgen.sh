@@ -27,3 +27,12 @@ mv x/evm/types/params_v0.pb.go x/evm/migrations/v0/types/params_v0.pb.go
 mv x/evm/types/chain_config_v0.pb.go x/evm/migrations/v0/types/chain_config_v0.pb.go
 mv x/evm/types/params_v4.pb.go x/evm/migrations/v4/types/params_v4.pb.go
 mv x/evm/types/trace_config_v0.pb.go x/evm/migrations/v0/types/trace_config_v0.pb.go
+
+# --------------
+# Generate protobuf files for the new google.golang.org/protobuf API
+#
+echo "Cleaning API directory"
+(cd api; find ./ -type f \( -iname \*.pulsar.go -o -iname \*.pb.go -o -iname \*.cosmos_orm.go -o -iname \*.pb.gw.go \) -delete; find . -empty -type d -delete; cd ..)
+
+echo "Generating API module"
+(cd proto; buf generate --template buf.gen.pulsar.yaml)

@@ -16,32 +16,34 @@
 package server
 
 import (
-	"context"
+	"io"
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"path/filepath"
+	"time"
 
 	"github.com/evmos/ethermint/server/config"
 	"github.com/gorilla/mux"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/netutil"
-	"golang.org/x/sync/errgroup"
 
+	log "cosmossdk.io/log"
+	dbm "github.com/cosmos/cosmos-db"
 	sdkserver "github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/version"
 
-	tcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
-	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
+	rpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 )
 
 // AddCommands adds server commands
 func AddCommands(
 	rootCmd *cobra.Command,
-	opts StartOptions,
+	defaultNodeHome string,
+	appCreator types.AppCreator,
 	appExport types.AppExporter,
 	addStartFlags types.ModuleInitFlags,
 ) {
@@ -55,31 +57,58 @@ func AddCommands(
 		sdkserver.ShowValidatorCmd(),
 		sdkserver.ShowAddressCmd(),
 		sdkserver.VersionCmd(),
-		tcmd.ResetAllCmd,
-		tcmd.ResetStateCmd,
-		sdkserver.BootstrapStateCmd(opts.AppCreator),
+		tmcmd.ResetAllCmd,
+		tmcmd.ResetStateCmd,
 	)
 
-	startCmd := StartCmd(opts)
+	startCmd := StartCmd(appCreator, defaultNodeHome)
 	addStartFlags(startCmd)
 
 	rootCmd.AddCommand(
 		startCmd,
 		tendermintCmd,
-		sdkserver.ExportCmd(appExport, opts.DefaultNodeHome),
+		sdkserver.ExportCmd(appExport, defaultNodeHome),
 		version.NewVersionCommand(),
-		sdkserver.NewRollbackCmd(opts.AppCreator, opts.DefaultNodeHome),
+		sdkserver.NewRollbackCmd(appCreator, defaultNodeHome),
 
 		// custom tx indexer command
 		NewIndexTxCmd(),
 	)
 }
 
+func ConnectTmWS(tmRPCAddr, tmEndpoint string, logger log.Logger) *rpcclient.WSClient {
+	tmWsClient, err := rpcclient.NewWS(tmRPCAddr, tmEndpoint,
+		rpcclient.MaxReconnectAttempts(256),
+		rpcclient.ReadWait(120*time.Second),
+		rpcclient.WriteWait(120*time.Second),
+		rpcclient.PingPeriod(50*time.Second),
+		rpcclient.OnReconnect(func() {
+			logger.Debug("EVM RPC reconnects to Tendermint WS", "address", tmRPCAddr+tmEndpoint)
+		}),
+	)
+
+	if err != nil {
+		logger.Error(
+			"Tendermint WS client could not be created",
+			"address", tmRPCAddr+tmEndpoint,
+			"error", err,
+		)
+	} else if err := tmWsClient.OnStart(); err != nil {
+		logger.Error(
+			"Tendermint WS client could not start",
+			"address", tmRPCAddr+tmEndpoint,
+			"error", err,
+		)
+	}
+
+	return tmWsClient
+}
+
 func MountGRPCWebServices(
 	router *mux.Router,
 	grpcWeb *grpcweb.WrappedGrpcServer,
 	grpcResources []string,
-	logger tmlog.Logger,
+	logger log.Logger,
 ) {
 	for _, res := range grpcResources {
 		logger.Info("[GRPC Web] HTTP POST mounted", "resource", res)
@@ -115,29 +144,26 @@ func Listen(addr string, config *config.Config) (net.Listener, error) {
 	return ln, err
 }
 
-// ListenForQuitSignals listens for SIGINT and SIGTERM. When a signal is received,
-// the cleanup function is called, indicating the caller can gracefully exit or
-// return.
-//
-// Note, the blocking behavior of this depends on the block argument.
-// The caller must ensure the corresponding context derived from the cancelFn is used correctly.
-func ListenForQuitSignals(g *errgroup.Group, block bool, cancelFn context.CancelFunc, logger tmlog.Logger) {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+func openDB(_ types.AppOptions, rootDir string, backendType dbm.BackendType) (dbm.DB, error) {
+	dataDir := filepath.Join(rootDir, "data")
+	return dbm.NewDB("application", backendType, dataDir)
+}
 
-	f := func() {
-		sig := <-sigCh
-		cancelFn()
+// OpenIndexerDB opens the custom eth indexer db, using the same db backend as the main app
+func OpenIndexerDB(rootDir string, backendType dbm.BackendType) (dbm.DB, error) {
+	dataDir := filepath.Join(rootDir, "data")
+	return dbm.NewDB("evmindexer", backendType, dataDir)
+}
 
-		logger.Info("caught signal", "signal", sig.String())
+func openTraceWriter(traceWriterFile string) (w io.WriteCloser, err error) {
+	if traceWriterFile == "" {
+		return
 	}
 
-	if block {
-		g.Go(func() error {
-			f()
-			return nil
-		})
-	} else {
-		go f()
-	}
+	filePath := filepath.Clean(traceWriterFile)
+	return os.OpenFile(
+		filePath,
+		os.O_WRONLY|os.O_APPEND|os.O_CREATE,
+		0o600,
+	)
 }

@@ -67,13 +67,13 @@ func WeightedOperations(
 		weightMsgEthCreateContract int
 	)
 
-	appParams.GetOrGenerate(cdc, OpWeightMsgEthSimpleTransfer, &weightMsgEthSimpleTransfer, nil,
+	appParams.GetOrGenerate(OpWeightMsgEthSimpleTransfer, &weightMsgEthSimpleTransfer, nil,
 		func(_ *rand.Rand) {
 			weightMsgEthSimpleTransfer = WeightMsgEthSimpleTransfer
 		},
 	)
 
-	appParams.GetOrGenerate(cdc, OpWeightMsgEthCreateContract, &weightMsgEthCreateContract, nil,
+	appParams.GetOrGenerate(OpWeightMsgEthCreateContract, &weightMsgEthCreateContract, nil,
 		func(_ *rand.Rand) {
 			weightMsgEthCreateContract = WeightMsgEthCreateContract
 		},

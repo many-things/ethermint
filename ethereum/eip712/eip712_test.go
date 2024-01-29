@@ -2,7 +2,13 @@ package eip712_test
 
 import (
 	"bytes"
+	"context"
+	signingv1beta1 "cosmossdk.io/api/cosmos/tx/signing/v1beta1"
+	txsigning "cosmossdk.io/x/tx/signing"
 	"fmt"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
+	"google.golang.org/protobuf/types/known/anypb"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -76,6 +82,9 @@ func (suite *EIP712TestSuite) SetupTest() {
 
 	sdk.GetConfig().SetBech32PrefixForAccount(config.Bech32Prefix, "")
 	eip712.SetEncodingConfig(suite.config)
+
+	// it must be set for StdSignBytes().
+	legacytx.RegressionTestingAminoCodec = suite.config.Amino
 }
 
 // createTestAddress creates random test addresses for messages
@@ -164,8 +173,8 @@ func (suite *EIP712TestSuite) TestEIP712() {
 			title: "Succeeds - Standard MsgDelegate",
 			msgs: []sdk.Msg{
 				stakingtypes.NewMsgDelegate(
-					suite.createTestAddress(),
-					sdk.ValAddress(suite.createTestAddress()),
+					suite.createTestAddress().String(),
+					sdk.ValAddress(suite.createTestAddress()).String(),
 					suite.makeCoins(suite.denom, math.NewInt(1))[0],
 				),
 			},
@@ -175,8 +184,8 @@ func (suite *EIP712TestSuite) TestEIP712() {
 			title: "Succeeds - Standard MsgWithdrawDelegationReward",
 			msgs: []sdk.Msg{
 				distributiontypes.NewMsgWithdrawDelegatorReward(
-					suite.createTestAddress(),
-					sdk.ValAddress(suite.createTestAddress()),
+					suite.createTestAddress().String(),
+					sdk.ValAddress(suite.createTestAddress()).String(),
 				),
 			},
 			expectSuccess: true,
@@ -185,13 +194,13 @@ func (suite *EIP712TestSuite) TestEIP712() {
 			title: "Succeeds - Two Single-Signer MsgDelegate",
 			msgs: []sdk.Msg{
 				stakingtypes.NewMsgDelegate(
-					params.address,
-					sdk.ValAddress(suite.createTestAddress()),
+					params.address.String(),
+					sdk.ValAddress(suite.createTestAddress()).String(),
 					suite.makeCoins(suite.denom, math.NewInt(1))[0],
 				),
 				stakingtypes.NewMsgDelegate(
-					params.address,
-					sdk.ValAddress(suite.createTestAddress()),
+					params.address.String(),
+					sdk.ValAddress(suite.createTestAddress()).String(),
 					suite.makeCoins(suite.denom, math.NewInt(5))[0],
 				),
 			},
@@ -291,8 +300,8 @@ func (suite *EIP712TestSuite) TestEIP712() {
 		{
 			title: "Fails - Single Message / Multi-Signer",
 			msgs: []sdk.Msg{
-				banktypes.NewMsgMultiSend(
-					[]banktypes.Input{
+				&banktypes.MsgMultiSend{
+					Inputs: []banktypes.Input{
 						banktypes.NewInput(
 							suite.createTestAddress(),
 							suite.makeCoins(suite.denom, math.NewInt(50)),
@@ -302,7 +311,7 @@ func (suite *EIP712TestSuite) TestEIP712() {
 							suite.makeCoins(suite.denom, math.NewInt(50)),
 						),
 					},
-					[]banktypes.Output{
+					Outputs: []banktypes.Output{
 						banktypes.NewOutput(
 							suite.createTestAddress(),
 							suite.makeCoins(suite.denom, math.NewInt(50)),
@@ -312,7 +321,7 @@ func (suite *EIP712TestSuite) TestEIP712() {
 							suite.makeCoins(suite.denom, math.NewInt(50)),
 						),
 					},
-				),
+				},
 			},
 			expectSuccess: false,
 		},
@@ -356,18 +365,30 @@ func (suite *EIP712TestSuite) TestEIP712() {
 					txBuilder.SetTimeoutHeight(tc.timeoutHeight)
 				}
 
-				signerData := authsigning.SignerData{
+				anyPubKey, err := codectypes.NewAnyWithValue(pubKey)
+				suite.Require().NoError(err)
+
+				signerData := txsigning.SignerData{
 					ChainID:       chainID,
 					AccountNumber: params.accountNumber,
 					Sequence:      params.sequence,
-					PubKey:        pubKey,
-					Address:       sdk.MustBech32ifyAddressBytes(config.Bech32Prefix, pubKey.Bytes()),
+					PubKey: &anypb.Any{
+						TypeUrl: anyPubKey.TypeUrl,
+						Value:   anyPubKey.Value,
+					},
+					Address: sdk.MustBech32ifyAddressBytes(config.Bech32Prefix, pubKey.Bytes()),
 				}
 
+				builtTx := txBuilder.GetTx()
+				adaptableTx, ok := builtTx.(authsigning.V2AdaptableTx)
+				suite.Require().True(ok)
+				txData := adaptableTx.GetSigningTxData()
+
 				bz, err := suite.clientCtx.TxConfig.SignModeHandler().GetSignBytes(
-					signMode,
+					context.Background(),
+					signingv1beta1.SignMode(signMode),
 					signerData,
-					txBuilder.GetTx(),
+					txData,
 				)
 				suite.Require().NoError(err)
 
@@ -451,18 +472,23 @@ func (suite *EIP712TestSuite) verifyPayloadMapAgainstFlattenedMap(original map[s
 	interfaceMessages, ok := original[msgsFieldName]
 	suite.Require().True(ok)
 
-	messages, ok := interfaceMessages.([]interface{})
-	suite.Require().True(ok)
-
-	// Verify message contents
-	for i, msg := range messages {
-		flattenedMsg, ok := flattened[fmt.Sprintf("msg%d", i)]
+	numMessages := 0
+	if interfaceMessages != nil {
+		messages, ok := interfaceMessages.([]interface{})
 		suite.Require().True(ok)
 
-		flattenedMsgJSON, ok := flattenedMsg.(map[string]interface{})
-		suite.Require().True(ok)
+		// Verify message contents
+		for i, msg := range messages {
+			flattenedMsg, ok := flattened[fmt.Sprintf("msg%d", i)]
+			suite.Require().True(ok)
 
-		suite.Require().Equal(flattenedMsgJSON, msg)
+			flattenedMsgJSON, ok := flattenedMsg.(map[string]interface{})
+			suite.Require().True(ok)
+
+			suite.Require().Equal(flattenedMsgJSON, msg)
+		}
+
+		numMessages = len(messages)
 	}
 
 	// Verify new payload does not have msgs field
@@ -472,7 +498,6 @@ func (suite *EIP712TestSuite) verifyPayloadMapAgainstFlattenedMap(original map[s
 	// Verify number of total keys
 	numKeysOriginal := len(original)
 	numKeysFlattened := len(flattened)
-	numMessages := len(messages)
 
 	// + N keys, then -1 for msgs
 	suite.Require().Equal(numKeysFlattened, numKeysOriginal+numMessages-1)

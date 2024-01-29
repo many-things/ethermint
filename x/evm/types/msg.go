@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
 
 	sdkmath "cosmossdk.io/math"
@@ -29,14 +30,18 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
-	"github.com/cosmos/cosmos-sdk/x/auth/signing"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+
+	evmapi "github.com/evmos/ethermint/api/ethermint/evm/v1"
+	protov2 "google.golang.org/protobuf/proto"
 )
 
 var (
@@ -234,6 +239,20 @@ func (msg *MsgEthereumTx) GetMsgs() []sdk.Msg {
 	return []sdk.Msg{msg}
 }
 
+func (msg *MsgEthereumTx) GetMsgsV2() ([]protov2.Message, error) {
+	m := evmapi.MsgEthereumTx{
+		Data: &anypb.Any{
+			TypeUrl: msg.Data.TypeUrl,
+			Value:   msg.Data.Value,
+		},
+		Size:           msg.Size_,
+		Hash:           msg.Hash,
+		DeprecatedFrom: msg.DeprecatedFrom,
+		From:           msg.From,
+	}
+	return []protov2.Message{&m}, nil
+}
+
 // GetSigners returns the expected signers for an Ethereum transaction message.
 // For such a message, there should exist only a single 'signer'.
 func (msg *MsgEthereumTx) GetSigners() []sdk.AccAddress {
@@ -292,7 +311,7 @@ func (msg *MsgEthereumTx) Sign(ethSigner ethtypes.Signer, keyringSigner keyring.
 	tx := msg.AsTransaction()
 	txHash := ethSigner.Hash(tx)
 
-	sig, _, err := keyringSigner.SignByAddress(from, txHash.Bytes())
+	sig, _, err := keyringSigner.SignByAddress(from, txHash.Bytes(), signing.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 	if err != nil {
 		return err
 	}
@@ -404,7 +423,7 @@ func (msg *MsgEthereumTx) UnmarshalBinary(b []byte, chainID *big.Int) error {
 }
 
 // BuildTx builds the canonical cosmos tx from ethereum msg
-func (msg *MsgEthereumTx) BuildTx(b client.TxBuilder, evmDenom string) (signing.Tx, error) {
+func (msg *MsgEthereumTx) BuildTx(b client.TxBuilder, evmDenom string) (authsigning.Tx, error) {
 	builder, ok := b.(authtx.ExtensionOptionsTxBuilder)
 	if !ok {
 		return nil, errors.New("unsupported builder")
@@ -456,4 +475,81 @@ func (m *MsgUpdateParams) ValidateBasic() error {
 // GetSignBytes implements the LegacyMsg interface.
 func (m MsgUpdateParams) GetSignBytes() []byte {
 	return sdk.MustSortJSON(AminoCdc.MustMarshalJSON(&m))
+}
+
+func GetSignersFromMsgEthereumTxV2(msg protov2.Message) ([][]byte, error) {
+	msgv1, err := GetMsgEthereumTxFromMsgV2(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	signers := [][]byte{}
+	for _, signer := range msgv1.GetSigners() {
+		signers = append(signers, signer.Bytes())
+	}
+
+	return signers, nil
+}
+
+func GetMsgEthereumTxFromMsgV2(msg protov2.Message) (MsgEthereumTx, error) {
+	msgv2, ok := msg.(*evmapi.MsgEthereumTx)
+	if !ok {
+		return MsgEthereumTx{}, fmt.Errorf("invalid x/evm/MsgEthereumTx msg v2: %v", msg)
+	}
+
+	var dataAny *codectypes.Any
+	var err error
+	switch msgv2.Data.TypeUrl {
+	case "/ethermint.evm.v1.LegacyTx":
+		legacyTx := LegacyTx{}
+		ModuleCdc.MustUnmarshal(msgv2.Data.Value, &legacyTx)
+		dataAny, err = PackTxData(&legacyTx)
+		if err != nil {
+			return MsgEthereumTx{}, err
+		}
+	case "/ethermint.evm.v1.DynamicFeeTx":
+		dynamicFeeTx := DynamicFeeTx{}
+		ModuleCdc.MustUnmarshal(msgv2.Data.Value, &dynamicFeeTx)
+		dataAny, err = PackTxData(&dynamicFeeTx)
+		if err != nil {
+			return MsgEthereumTx{}, err
+		}
+	case "/ethermint.evm.v1.AccessListTx":
+		accessListTx := AccessListTx{}
+		ModuleCdc.MustUnmarshal(msgv2.Data.Value, &accessListTx)
+		dataAny, err = PackTxData(&accessListTx)
+		if err != nil {
+			return MsgEthereumTx{}, err
+		}
+	}
+	msgv1 := MsgEthereumTx{Data: dataAny}
+	msgv1.Hash = msgv1.AsTransaction().Hash().Hex()
+	return msgv1, nil
+}
+
+func GetSignersFromMsgUpdateParamsV2(msg protov2.Message) ([][]byte, error) {
+	msgv1, err := GetMsgUpdateParamsFromMsgV2(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	signers := [][]byte{}
+	for _, signer := range msgv1.GetSigners() {
+		signers = append(signers, signer.Bytes())
+	}
+
+	return signers, nil
+}
+
+func GetMsgUpdateParamsFromMsgV2(msg protov2.Message) (MsgUpdateParams, error) {
+	msgv2, ok := msg.(*evmapi.MsgUpdateParams)
+	if !ok {
+		return MsgUpdateParams{}, fmt.Errorf("invalid x/evm/MsgUpdateParams msg v2: %v", msg)
+	}
+
+	msgv1 := MsgUpdateParams{
+		Authority: msgv2.Authority,
+	}
+
+	return msgv1, nil
 }

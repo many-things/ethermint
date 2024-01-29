@@ -1,6 +1,7 @@
 package ante_test
 
 import (
+	sdkmath "cosmossdk.io/math"
 	"fmt"
 	"time"
 
@@ -276,7 +277,7 @@ func (suite *AnteTestSuite) TestRejectDeliverMsgsInAuthz() {
 					},
 				),
 			},
-			expectedCode: sdkerrors.ErrUnpackAny.ABCICode(),
+			expectedCode: sdkerrors.ErrUnauthorized.ABCICode(), // NOTE(thai):
 		},
 		{
 			name: "a MsgExec with nested MsgExec messages that has invalid messages is blocked",
@@ -289,7 +290,7 @@ func (suite *AnteTestSuite) TestRejectDeliverMsgsInAuthz() {
 					},
 				),
 			},
-			expectedCode: sdkerrors.ErrUnpackAny.ABCICode(),
+			expectedCode: sdkerrors.ErrUnauthorized.ABCICode(), // NOTE(thai):
 		},
 		{
 			name: "a MsgExec with more nested MsgExec messages than allowed and with valid messages is blocked",
@@ -327,20 +328,22 @@ func (suite *AnteTestSuite) TestRejectDeliverMsgsInAuthz() {
 			bz, err := txEncoder(tx)
 			suite.Require().NoError(err)
 
-			resCheckTx := suite.app.CheckTx(
-				abci.RequestCheckTx{
+			resCheckTx, _ := suite.app.CheckTx(
+				&abci.RequestCheckTx{
 					Tx:   bz,
 					Type: abci.CheckTxType_New,
 				},
 			)
 			suite.Require().Equal(resCheckTx.Code, tc.expectedCode, resCheckTx.Log)
 
-			resDeliverTx := suite.app.DeliverTx(
-				abci.RequestDeliverTx{
-					Tx: bz,
+			resFinalizeBlock, _ := suite.app.FinalizeBlock(
+				&abci.RequestFinalizeBlock{
+					Height: suite.app.LastBlockHeight() + 1,
+					Txs:    [][]byte{bz},
 				},
 			)
-			suite.Require().Equal(resDeliverTx.Code, tc.expectedCode, resDeliverTx.Log)
+			suite.Require().Equal(len(resFinalizeBlock.TxResults), 1)
+			suite.Require().Equal(resFinalizeBlock.TxResults[0].Code, tc.expectedCode, resFinalizeBlock.TxResults[0].Log)
 		})
 	}
 }
@@ -425,7 +428,7 @@ func (suite *AnteTestSuite) createTx(priv cryptotypes.PrivKey, msgs ...sdk.Msg) 
 }
 
 func (suite *AnteTestSuite) createEIP712Tx(priv cryptotypes.PrivKey, msgs ...sdk.Msg) (sdk.Tx, error) {
-	coinAmount := sdk.NewCoin(evmtypes.DefaultEVMDenom, sdk.NewInt(20))
+	coinAmount := sdk.NewCoin(evmtypes.DefaultEVMDenom, sdkmath.NewInt(20))
 	fees := sdk.NewCoins(coinAmount)
 	cosmosTxArgs := utiltx.CosmosTxArgs{
 		TxCfg:   suite.clientCtx.TxConfig,

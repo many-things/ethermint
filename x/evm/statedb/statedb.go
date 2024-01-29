@@ -16,6 +16,8 @@
 package statedb
 
 import (
+	sdkmath "cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	"fmt"
 	"math/big"
 	"sort"
@@ -328,11 +330,11 @@ func (s *StateDB) setStateObject(object *stateObject) {
 	s.stateObjects[object.Address()] = object
 }
 
-func (s *StateDB) cloneNativeState() sdk.MultiStore {
+func (s *StateDB) cloneNativeState() storetypes.MultiStore {
 	return s.cacheMultiStore().Clone()
 }
 
-func (s *StateDB) restoreNativeState(ms sdk.MultiStore) {
+func (s *StateDB) restoreNativeState(ms storetypes.MultiStore) {
 	manager := sdk.NewEventManager()
 	s.cacheCtx = s.cacheCtx.WithMultiStore(ms).WithEventManager(manager)
 }
@@ -370,7 +372,7 @@ func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
 	if amount.Sign() <= 0 {
 		return
 	}
-	coins := sdk.Coins{sdk.NewCoin(s.evmDenom, sdk.NewIntFromBigInt(amount))}
+	coins := sdk.Coins{sdk.NewCoin(s.evmDenom, sdkmath.NewIntFromBigInt(amount))}
 	if err := s.ExecuteNativeAction(common.Address{}, nil, func(ctx sdk.Context) error {
 		return s.keeper.AddBalance(ctx, sdk.AccAddress(addr.Bytes()), coins)
 	}); err != nil {
@@ -383,7 +385,7 @@ func (s *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	if amount.Sign() <= 0 {
 		return
 	}
-	coins := sdk.Coins{sdk.NewCoin(s.evmDenom, sdk.NewIntFromBigInt(amount))}
+	coins := sdk.Coins{sdk.NewCoin(s.evmDenom, sdkmath.NewIntFromBigInt(amount))}
 	if err := s.ExecuteNativeAction(common.Address{}, nil, func(ctx sdk.Context) error {
 		return s.keeper.SubBalance(ctx, sdk.AccAddress(addr.Bytes()), coins)
 	}); err != nil {

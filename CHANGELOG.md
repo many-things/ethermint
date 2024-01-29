@@ -122,7 +122,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 - (evm) [#1272](https://github.com/evmos/ethermint/pull/1272) Implement modular interface for the EVM.
 - (deps) [#1551](https://github.com/evmos/ethermint/pull/1551) Upgrade Cosmos SDK to [`v0.46.7`](https://github.com/cosmos/cosmos-sdk/releases/tag/v0.46.7).
 - (feemarket) [#1194](https://github.com/evmos/ethermint/pull/1194) Apply feemarket to native cosmos tx.
-- (eth) [#1346](https://github.com/evmos/ethermint/pull/1346) Added support for `sdk.Dec` and `ed25519` type on eip712.
+- (eth) [#1346](https://github.com/evmos/ethermint/pull/1346) Added support for `sdkmath.LegacyDec` and `ed25519` type on eip712.
 - (evm) [#1452](https://github.com/evmos/ethermint/pull/1452) Simplify Gas Math in `ApplyTransaction`.
 - (eth) [#1430](https://github.com/evmos/ethermint/pull/1430) Added support for array of type `Any` on eip712.
 - (ante) [1460](https://github.com/evmos/ethermint/pull/1460) Add KV Gas config on ethereum Txs.
@@ -653,7 +653,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 - (proto) [tharsis#448](https://github.com/evmos/ethermint/pull/448) Bump version for all Ethermint messages to `v1`
 - (server) [tharsis#434](https://github.com/evmos/ethermint/pull/434) `evm-rpc` flags and app config have been renamed to `json-rpc`.
-- (proto, evm) [tharsis#207](https://github.com/evmos/ethermint/issues/207) Replace `big.Int` in favor of `sdk.Int` for `TxData` fields
+- (proto, evm) [tharsis#207](https://github.com/evmos/ethermint/issues/207) Replace `big.Int` in favor of `sdkmath.Int` for `TxData` fields
 - (proto, evm) [tharsis#81](https://github.com/evmos/ethermint/pull/81) gRPC Query and Tx service changes:
   - The `TxReceipt`, `TxReceiptsByBlockHeight` endpoints have been removed from the Query service.
   - The `ContractAddress`, `Bloom` have been removed from the `MsgEthereumTxResponse` and the

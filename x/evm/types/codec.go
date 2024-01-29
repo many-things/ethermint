@@ -27,13 +27,12 @@ import (
 )
 
 var (
-	amino = codec.NewLegacyAmino()
 	// ModuleCdc references the global evm module codec. Note, the codec should
 	// ONLY be used in certain instances of tests and for JSON encoding.
 	ModuleCdc = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 
 	// AminoCdc is a amino codec created to support amino JSON compatible msgs.
-	AminoCdc = codec.NewAminoCodec(amino)
+	AminoCdc = codec.NewLegacyAmino()
 )
 
 const (
@@ -43,16 +42,12 @@ const (
 
 // NOTE: This is required for the GetSignBytes function
 func init() {
-	RegisterLegacyAminoCodec(amino)
-	amino.Seal()
+	RegisterLegacyAminoCodec(AminoCdc)
+	AminoCdc.Seal()
 }
 
 // RegisterInterfaces registers the client interfaces to protobuf Any.
 func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
-	registry.RegisterImplementations(
-		(*sdk.Msg)(nil),
-		&MsgEthereumTx{},
-	)
 	registry.RegisterImplementations(
 		(*tx.TxExtensionOptionI)(nil),
 		&ExtensionOptionsEthereumTx{},

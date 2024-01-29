@@ -176,7 +176,7 @@ build-all: tools build lint test vulncheck
 ###############################################################################
 
 PACKAGE_NAME:=github.com/evmos/ethermint
-GOLANG_CROSS_VERSION = v1.19
+GOLANG_CROSS_VERSION = v1.21
 GOPATH ?= '$(HOME)/go'
 release-dry-run:
 	docker run \
@@ -438,7 +438,7 @@ format-fix:
 ###############################################################################
 
 
-protoVer=0.11.6
+protoVer=0.14.0
 protoImageName=ghcr.io/cosmos/proto-builder:$(protoVer)
 protoImage=$(DOCKER) run --rm -v $(CURDIR):/workspace --workdir /workspace $(protoImageName)
 

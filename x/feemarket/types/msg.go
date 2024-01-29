@@ -2,7 +2,10 @@ package types
 
 import (
 	errorsmod "cosmossdk.io/errors"
+	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	feemarketapi "github.com/evmos/ethermint/api/ethermint/feemarket/v1"
+	protov2 "google.golang.org/protobuf/proto"
 )
 
 var _ sdk.Msg = &MsgUpdateParams{}
@@ -25,4 +28,31 @@ func (m *MsgUpdateParams) ValidateBasic() error {
 // GetSignBytes implements the LegacyMsg interface.
 func (m MsgUpdateParams) GetSignBytes() []byte {
 	return sdk.MustSortJSON(AminoCdc.MustMarshalJSON(&m))
+}
+
+func GetSignersFromMsgUpdateParamsV2(msg protov2.Message) ([][]byte, error) {
+	msgv1, err := GetMsgUpdateParamsFromMsgV2(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	signers := [][]byte{}
+	for _, signer := range msgv1.GetSigners() {
+		signers = append(signers, signer.Bytes())
+	}
+
+	return signers, nil
+}
+
+func GetMsgUpdateParamsFromMsgV2(msg protov2.Message) (MsgUpdateParams, error) {
+	msgv2, ok := msg.(*feemarketapi.MsgUpdateParams)
+	if !ok {
+		return MsgUpdateParams{}, fmt.Errorf("invalid x/feemarket/MsgUpdateParams msg v2: %v", msg)
+	}
+
+	msgv1 := MsgUpdateParams{
+		Authority: msgv2.Authority,
+	}
+
+	return msgv1, nil
 }

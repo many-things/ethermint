@@ -31,7 +31,7 @@ import (
 
 var (
 	feeAmt     = math.Pow10(16)
-	DefaultFee = sdk.NewCoin(evmtypes.DefaultEVMDenom, sdk.NewIntFromUint64(uint64(feeAmt)))
+	DefaultFee = sdk.NewCoin(evmtypes.DefaultEVMDenom, sdkmath.NewIntFromUint64(uint64(feeAmt)))
 )
 
 // CosmosTxArgs contains the params to create a cosmos tx
@@ -101,12 +101,17 @@ func signCosmosTx(
 		return nil, err
 	}
 
+	defaultSignMode, err := authsigning.APISignModeToInternal(args.TxCfg.SignModeHandler().DefaultMode())
+	if err != nil {
+		return nil, err
+	}
+
 	// First round: we gather all the signer infos. We use the "set empty
 	// signature" hack to do that.
 	sigV2 := signing.SignatureV2{
 		PubKey: args.Priv.PubKey(),
 		Data: &signing.SingleSignatureData{
-			SignMode:  args.TxCfg.SignModeHandler().DefaultMode(),
+			SignMode:  defaultSignMode,
 			Signature: nil,
 		},
 		Sequence: seq,
@@ -124,9 +129,11 @@ func signCosmosTx(
 		ChainID:       args.ChainID,
 		AccountNumber: accNumber,
 		Sequence:      seq,
+		PubKey:        args.Priv.PubKey(),
 	}
 	sigV2, err = tx.SignWithPrivKey(
-		args.TxCfg.SignModeHandler().DefaultMode(),
+		ctx,
+		defaultSignMode,
 		signerData,
 		txBuilder, args.Priv, args.TxCfg,
 		seq,

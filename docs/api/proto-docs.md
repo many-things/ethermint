@@ -167,7 +167,7 @@ AccessTuple is the element type of an access list.
 <a name="ethermint.evm.v1.ChainConfig"></a>
 
 ### ChainConfig
-ChainConfig defines the Ethereum ChainConfig parameters using *sdk.Int values
+ChainConfig defines the Ethereum ChainConfig parameters using *sdkmath.Int values
 instead of *big.Int.
 
 
@@ -1136,7 +1136,7 @@ Query defines the gRPC querier service.
 <a name="ethermint.types.v1.EthAccount"></a>
 
 ### EthAccount
-EthAccount implements the authtypes.AccountI interface and embeds an
+EthAccount implements the sdk.AccountI interface and embeds an
 authtypes.BaseAccount type. It is compatible with the auth AccountKeeper.
 
 
