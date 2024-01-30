@@ -830,7 +830,7 @@ func newTestKeeper(t *testing.T, cms storetypes.MultiStore) (sdk.Context, *evmke
 		accountKeeper, bankKeeper, nil, nil,
 		"",
 		paramstypes.Subspace{}, nil,
-		allKeys,
+		func() map[string]storetypes.StoreKey { return allKeys },
 	)
 
 	ctx := sdk.NewContext(cms, tmproto.Header{}, false, log.NewNopLogger())

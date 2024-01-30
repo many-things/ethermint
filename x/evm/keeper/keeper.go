@@ -77,9 +77,9 @@ type Keeper struct {
 	ss                paramstypes.Subspace
 	customContractFns []CustomContractFn
 
-	// a set of store keys that should cover all the precompile use cases,
-	// or ideally just pass the application's all stores.
-	keys map[string]storetypes.StoreKey
+	// returns a set of store keys that should cover all the precompile use cases,
+	// or ideally just returns the application's all stores.
+	getStoreKeys func() map[string]storetypes.StoreKey
 }
 
 // NewKeeper generates new evm module keeper
@@ -94,7 +94,7 @@ func NewKeeper(
 	tracer string,
 	ss paramstypes.Subspace,
 	customContractFns []CustomContractFn,
-	keys map[string]storetypes.StoreKey,
+	getStoreKeys func() map[string]storetypes.StoreKey,
 ) *Keeper {
 	// ensure evm module account is set
 	if addr := ak.GetModuleAddress(types.ModuleName); addr == nil {
@@ -119,12 +119,12 @@ func NewKeeper(
 		tracer:            tracer,
 		ss:                ss,
 		customContractFns: customContractFns,
-		keys:              keys,
+		getStoreKeys:      getStoreKeys,
 	}
 }
 
 func (k Keeper) StoreKeys() map[string]storetypes.StoreKey {
-	return k.keys
+	return k.getStoreKeys()
 }
 
 // Logger returns a module-specific logger.
