@@ -279,7 +279,7 @@ func startStandAlone(
 	addr := svrCtx.Viper.GetString(srvflags.Address)
 	transport := svrCtx.Viper.GetString(srvflags.Transport)
 
-	svr, err := abciserver.NewServer(addr, transport, NewCometApplication(app))
+	svr, err := abciserver.NewServer(addr, transport, server.NewCometABCIWrapper(app))
 	if err != nil {
 		return fmt.Errorf("error creating listener: %v", err)
 	}
@@ -519,7 +519,7 @@ func startCmtNode(
 		cfg,
 		pvm.LoadOrGenFilePV(cfg.PrivValidatorKeyFile(), cfg.PrivValidatorStateFile()),
 		nodeKey,
-		proxy.NewLocalClientCreator(NewCometApplication(app)),
+		proxy.NewLocalClientCreator(server.NewCometABCIWrapper(app)),
 		getGenDocProvider(cfg),
 		cmtcfg.DefaultDBProvider,
 		node.DefaultMetricsProvider(cfg.Instrumentation),

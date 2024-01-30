@@ -35,6 +35,7 @@ import (
 
 	"cosmossdk.io/log"
 
+	sdkserver "github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/server/api"
 	servergrpc "github.com/cosmos/cosmos-sdk/server/grpc"
 	servercmtlog "github.com/cosmos/cosmos-sdk/server/log"
@@ -83,7 +84,7 @@ func startInProcess(cfg Config, val *Validator) error {
 		cmtCfg,
 		pvm.LoadOrGenFilePV(cmtCfg.PrivValidatorKeyFile(), cmtCfg.PrivValidatorStateFile()),
 		nodeKey,
-		proxy.NewLocalClientCreator(server.NewCometApplication(app)),
+		proxy.NewLocalClientCreator(sdkserver.NewCometABCIWrapper(app)),
 		appGenesisProvider,
 		cmtcfg.DefaultDBProvider,
 		node.DefaultMetricsProvider(cmtCfg.Instrumentation),
