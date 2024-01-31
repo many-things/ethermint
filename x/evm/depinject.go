@@ -10,6 +10,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	modulev1 "github.com/evmos/ethermint/api/ethermint/evm/module/v1"
+	"github.com/evmos/ethermint/server/config"
 	srvflags "github.com/evmos/ethermint/server/flags"
 	"github.com/evmos/ethermint/x/evm/keeper"
 	"github.com/evmos/ethermint/x/evm/types"
@@ -27,7 +28,7 @@ type DepInjectInput struct {
 	ModuleKey depinject.OwnModuleKey
 	Config    *modulev1.Module
 	Codec     codec.Codec
-	AppOpts   servertypes.AppOptions
+	AppOpts   servertypes.AppOptions `optional:"true"`
 
 	KVStoreKey        *storetypes.KVStoreKey
 	TransientStoreKey *storetypes.TransientStoreKey
@@ -58,7 +59,10 @@ func ProvideModule(in DepInjectInput) DepInjectOutput {
 		authority = authtypes.NewModuleAddressOrBech32Address(in.Config.Authority)
 	}
 
-	tracer := cast.ToString(in.AppOpts.Get(srvflags.EVMTracer))
+	tracer := config.DefaultEVMTracer
+	if in.AppOpts != nil {
+		tracer = cast.ToString(in.AppOpts.Get(srvflags.EVMTracer))
+	}
 
 	k := keeper.NewKeeper(
 		in.Codec, in.KVStoreKey, in.TransientStoreKey,
