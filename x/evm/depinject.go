@@ -39,8 +39,7 @@ type DepInjectInput struct {
 	StakingKeeper   types.StakingKeeper
 	FeeMarketKeeper types.FeeMarketKeeper
 
-	GetCustomContractFns func() []keeper.CustomContractFn
-	GetStoreKeys         func() map[string]storetypes.StoreKey // TODO(thai): think better way
+	GetStoreKeys func() map[string]storetypes.StoreKey // TODO(thai): think better way
 }
 
 // DepInjectOutput is the output for the dep inject framework.
@@ -70,7 +69,6 @@ func ProvideModule(in DepInjectInput) DepInjectOutput {
 		in.AuthKeeper, in.BankKeeper, in.StakingKeeper, in.FeeMarketKeeper,
 		tracer,
 		in.Subspace,
-		in.GetCustomContractFns(),
 		in.GetStoreKeys,
 	)
 	m := NewAppModule(k, in.AuthKeeper, in.Subspace)

@@ -829,7 +829,7 @@ func newTestKeeper(t *testing.T, cms storetypes.MultiStore) (sdk.Context, *evmke
 		appCodec, testStoreKeys[evmtypes.StoreKey], testTransientKeys[evmtypes.TransientKey], authtypes.NewModuleAddress(govtypes.ModuleName),
 		accountKeeper, bankKeeper, nil, nil,
 		"",
-		paramstypes.Subspace{}, nil,
+		paramstypes.Subspace{},
 		func() map[string]storetypes.StoreKey { return allKeys },
 	)
 

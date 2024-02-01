@@ -473,7 +473,7 @@ func NewEthermintApp(
 		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey], authtypes.NewModuleAddress(govtypes.ModuleName),
 		app.AccountKeeper, app.BankKeeper, app.StakingKeeper, app.FeeMarketKeeper,
 		tracer,
-		evmSs, nil,
+		evmSs,
 		func() map[string]storetypes.StoreKey { return allKeys },
 	)
 

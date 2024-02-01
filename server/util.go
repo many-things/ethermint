@@ -47,18 +47,20 @@ func AddCommands(
 	appExport types.AppExporter,
 	addStartFlags types.ModuleInitFlags,
 ) {
-	tendermintCmd := &cobra.Command{
-		Use:   "tendermint",
-		Short: "Tendermint subcommands",
+	cometCmd := &cobra.Command{
+		Use:     "comet",
+		Aliases: []string{"cometbft", "tendermint"},
+		Short:   "CometBFT subcommands",
 	}
 
-	tendermintCmd.AddCommand(
+	cometCmd.AddCommand(
 		sdkserver.ShowNodeIDCmd(),
 		sdkserver.ShowValidatorCmd(),
 		sdkserver.ShowAddressCmd(),
 		sdkserver.VersionCmd(),
 		tmcmd.ResetAllCmd,
 		tmcmd.ResetStateCmd,
+		sdkserver.BootstrapStateCmd(appCreator),
 	)
 
 	startCmd := StartCmd(appCreator, defaultNodeHome)
@@ -66,7 +68,7 @@ func AddCommands(
 
 	rootCmd.AddCommand(
 		startCmd,
-		tendermintCmd,
+		cometCmd,
 		sdkserver.ExportCmd(appExport, defaultNodeHome),
 		version.NewVersionCommand(),
 		sdkserver.NewRollbackCmd(appCreator, defaultNodeHome),

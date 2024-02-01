@@ -16,11 +16,11 @@
 package keeper
 
 import (
-	sdkmath "cosmossdk.io/math"
 	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -93,7 +93,6 @@ func NewKeeper(
 	fmk types.FeeMarketKeeper,
 	tracer string,
 	ss paramstypes.Subspace,
-	customContractFns []CustomContractFn,
 	getStoreKeys func() map[string]storetypes.StoreKey,
 ) *Keeper {
 	// ensure evm module account is set
@@ -118,13 +117,17 @@ func NewKeeper(
 		transientKey:      transientKey,
 		tracer:            tracer,
 		ss:                ss,
-		customContractFns: customContractFns,
+		customContractFns: []CustomContractFn{},
 		getStoreKeys:      getStoreKeys,
 	}
 }
 
 func (k Keeper) StoreKeys() map[string]storetypes.StoreKey {
 	return k.getStoreKeys()
+}
+
+func (k *Keeper) RegisterCustomContractFns(fns []CustomContractFn) {
+	k.customContractFns = append(k.customContractFns, fns...)
 }
 
 // Logger returns a module-specific logger.
